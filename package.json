@@ -1,0 +1,14 @@
+{
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.2",
+    "vite": "^8.0.14"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "tauri-plugin-polygon-api": "^0.1.2"
+  }
+}

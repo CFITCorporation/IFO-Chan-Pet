@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="zh-CN" xmlns="http://schemas.microsoft.com/wix/2006/localization">
+  <String Id="WixUI_InstallDir_InstallDirDlg_Title">安装目录</String>
+  <String Id="WixUI_InstallDir_InstallDirDlg_DestinationFolder">目标文件夹</String>
+  <String Id="WixUI_InstallDir_InstallDirDlg_Browse">浏览(&B)...</String>
+  <String Id="WixUI_InstallDir_InstallDirDlg_Reset">重置(&R)</String>
+
+  <!-- 欢迎对话框 -->
+  <String Id="WixUI_WelcomeDlg_Title">欢迎使用 {0} 安装向导</String>
+  <String Id="WixUI_WelcomeDlg_Description">安装程序将引导您完成 {0} 的安装。</String>
+  <String Id="WixUI_WelcomeDlg_Text">建议您在继续之前关闭所有其他应用程序。单击“下一步”继续，或单击“取消”退出。</String>
+
+  <!-- 完成对话框 -->
+  <String Id="WixUI_ExitDialog_Title">安装完成</String>
+  <String Id="WixUI_ExitDialog_Text">{0} 已成功安装。{1}</String>
+  <String Id="WixUI_ExitDialog_Description">单击“完成”退出安装向导。</String>
+  <String Id="WixUI_ExitDialog_Launch">启动 {0}</String>
+
+  <!-- 许可协议对话框（如果你提供了 license.rtf） -->
+  <String Id="WixUI_LicenseAgreementDlg_Title">许可协议</String>
+  <String Id="WixUI_LicenseAgreementDlg_Description">请仔细阅读以下许可协议。</String>
+  <String Id="WixUI_LicenseAgreementDlg_Text">您必须接受此协议才能安装 {0}。</String>
+  <String Id="WixUI_LicenseAgreementDlg_Accept">我接受(&A)</String>
+  <String Id="WixUI_LicenseAgreementDlg_Decline">我不接受(&D)</String>
+
+  <!-- 进度对话框 -->
+  <String Id="WixUI_ProgressDlg_Title">正在安装 {0}</String>
+  <String Id="WixUI_ProgressDlg_Description">请稍候，安装程序正在将 {0} 复制到您的计算机。</String>
+
+  <!-- 安装类型对话框（如果有功能选择） -->
+  <String Id="WixUI_InstallDir_InstallScopeDlg_Title">安装类型</String>
+  <String Id="WixUI_InstallDir_InstallScopeDlg_Description">选择安装类型和安装范围。</String>
+  <String Id="WixUI_InstallDir_InstallScopeDlg_JustMe">仅为我安装</String>
+  <String Id="WixUI_InstallDir_InstallScopeDlg_AllUsers">为所有用户安装（需要管理员权限）</String>
+
+  <!-- 通用按钮 -->
+  <String Id="WixUI_Button_Next">下一步(&N)</String>
+  <String Id="WixUI_Button_Back">上一步(&B)</String>
+  <String Id="WixUI_Button_Cancel">取消(&C)</String>
+  <String Id="WixUI_Button_Finish">完成(&F)</String>
+
+  <!-- 错误和状态 -->
+  <String Id="WixUI_InvalidDir">所选目录无效。请选择其他目录。</String>
+  <String Id="WixUI_NoDir">请输入安装目录。</String>
+</WixLocalization>

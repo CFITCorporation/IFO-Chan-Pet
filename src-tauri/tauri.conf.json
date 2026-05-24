@@ -1,0 +1,62 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "IFO-Chan",
+  "version": "1.1.0",
+  "identifier": "com.ifo.cfit",
+  "build": {
+    "frontendDist": "../build",
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "",
+        "resizable": false,
+        "fullscreen": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "transparent": true,
+        "shadow": false,
+        "skipTaskbar": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons-radius/32x32.png",
+      "icons-radius/128x128.png",
+      "icons-radius/128x128@2x.png",
+      "icons-radius/icon.ico"
+    ],
+    "publisher": "CFIT Air Cargo",
+    "copyright": "Copyright © 2025 CFIT",
+    "category": "Utility",
+    "shortDescription": "IFO CFIT酱~",
+    "longDescription": "来自冰火源的CFIT酱，她来啦！",
+    "createUpdaterArtifacts": false,
+    "targets": "all",
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    },
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons-radius/icon.ico",
+        "uninstallerIcon": "icons-radius/icon.ico",
+        "template": "nsis/installer.nsi",
+        "displayLanguageSelector": true,
+        "languages": ["SimpChinese","English"]
+
+      },
+      "wix": {
+        "template": "msi/main.wxs",
+        "language": "zh-CN"
+      }
+    }
+  }
+}

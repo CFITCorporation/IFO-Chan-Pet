@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"enables the default permissions","local":true,"windows":["main"],"permissions":["core:default","polygon:allow-register","polygon:allow-register-all","polygon:allow-show","polygon:allow-hide","polygon:allow-remove","polygon:allow-update","polygon:allow-clear"]}}

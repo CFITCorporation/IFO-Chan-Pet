@@ -1,0 +1,15 @@
+{
+	"Type": "Live2D Expression",
+	"Parameters": [
+		{
+			"Id": "ParamHairFront",
+			"Value": 0,
+			"Blend": "Add"
+		},
+		{
+			"Id": "ParamHairSide",
+			"Value": 0,
+			"Blend": "Add"
+		}
+	]
+}

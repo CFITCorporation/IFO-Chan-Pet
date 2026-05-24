@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en" style="background:transparent">
+<meta name="viewport" content="width=device-width, initial-scale=0.5, maximum-scale=0.5, user-scalable=0">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Ice-File Origin 冰火源</title>
+</head>
+<style>
+</style>
+
+<body style="background:transparent">
+    <div id="ball" data-tauri-drag-region></div>
+    <canvas class="live2d" id="live2d" height="637.5" width="337.5"
+        style="pointer-events:none;position:absolute;z-index:10000;right:20px;bottom:60px;right:5px"></canvas>
+    <style>
+        .live2d {
+            opacity: 0;
+            transition: opacity 0.8s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+
+        .live2d.visible {
+            opacity: 0.75;
+        }
+
+        .drag-float-ball {
+            position: fixed;
+            width: 52px;
+            height: 52px;
+            bottom: 80px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            z-index: 10001;
+            user-select: none;
+            transition: transform 0.2s ease, box-shadow 0.2s;
+            padding: 6px;
+            box-sizing: border-box;
+            /*-webkit-app-region: drag;
+  app-region: drag;*/
+        }
+
+        .drag-float-ball:active {
+            cursor: grabbing;
+            transform: scale(0.94);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .drag-float-ball svg {
+            width: 26px;
+            height: 26px;
+            display: block;
+            pointer-events: none;
+            filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+        }
+
+        @media (max-width: 768px) {
+            .drag-float-ball {
+                width: 48px;
+                height: 48px;
+                bottom: 70px;
+                right: 16px;
+            }
+
+            .drag-float-ball svg {
+                width: 28px;
+                height: 28px;
+            }
+        }
+    </style>
+    <script type="module">
+        import { init } from './l2d.js';
+        import { polygon } from 'tauri-plugin-polygon-api'; const canvas = document.getElementById('live2d');
+        const l2d = init(canvas);
+
+        const modelPath = 'cfitchan-0504/cfitchan_lively.model3.json';
+
+        let blinkState = 'idle';    // idle, closing, opening
+        let blinkStartTime = 0;
+        let blinkDuration = 0;      // 单阶段持续时间（ms）
+
+        // 眨眼参数
+        const CLOSE_DURATION = 1200;    // 从完全睁开到完全闭合的过渡时间（ms）
+        const OPEN_DURATION = 1600;     // 从完全闭合到完全睁开的过渡时间（ms）
+        const MIN_IDLE = 2000;        // 两次眨眼之间的最小空闲时间（ms）
+        const MAX_IDLE = 5000;        // 最大空闲时间
+
+        let nextBlinkTimer = null;
+        let animationFrameId = null;
+        let currentEyeBallY = 1.0;
+        let eyeOpen = 1.0;
+        const paramsMap = {
+            'ParamAngleX': (val) => val * 8,
+            'ParamAngleY': (val) => val * 16,
+            'ParamAngleZ': (val) => val * 8
+        };
+
+        function updateAllParams(eyeLOpen, eyeROpen, eyeBallY) {
+            const currentParams = l2d.getParams();
+            const finalParams = {};
+
+            currentParams.forEach(param => {
+                let { id, value } = param;
+
+                if (paramsMap[id]) {
+                    const processedValue = paramsMap[id](value);
+                    finalParams[id] = Math.min(30, Math.max(-30, processedValue));
+                } else {
+                    finalParams[id] = value;
+                }
+            });
+
+        }
+        let eyeBallYAnimationId = null;
+        let eyeBallYPeriod = 4000;
+        let eyeBallYStartTime = null;
+        let periodChangeTimer = null;
+        function setEyeOpen(value) {
+            value = Math.min(1.0, Math.max(0.0, value));
+            eyeOpen = value;
+            let finalParam = {}
+            finalParam['ParamEyeLOpen'] = eyeOpen;
+            finalParam['ParamEyeROpen'] = eyeOpen;
+            finalParam['ParamEyeBallY'] = currentEyeBallY;
+            l2d.setParams(finalParam);
+        }
+
+        function updateEyeBallY(now) {
+            if (!eyeBallYStartTime) eyeBallYStartTime = now;
+            const elapsed = now - eyeBallYStartTime;
+            const t = (elapsed % eyeBallYPeriod) / eyeBallYPeriod;
+            const value = Math.sin(t * Math.PI * 2);
+            currentEyeBallY = value;
+            let finalParam = {}
+            finalParam['ParamEyeLOpen'] = eyeOpen;
+            finalParam['ParamEyeROpen'] = eyeOpen;
+            finalParam['ParamEyeBallY'] = currentEyeBallY;
+            l2d.setParams(finalParam);
+            eyeBallYAnimationId = requestAnimationFrame(updateEyeBallY);
+        }
+
+        function startDynamicPeriodChange() {
+            if (periodChangeTimer) clearTimeout(periodChangeTimer);
+            const delay = 5000 + Math.random() * 5000;
+            periodChangeTimer = setTimeout(() => {
+                const now = performance.now();
+                const elapsed = now - eyeBallYStartTime;
+                const oldPhase = (elapsed % eyeBallYPeriod) / eyeBallYPeriod;
+                const newPeriod = 2000 + Math.random() * 4000;
+                const newElapsed = oldPhase * newPeriod;
+                eyeBallYStartTime = now - newElapsed;
+                eyeBallYPeriod = newPeriod;
+                startDynamicPeriodChange();
+            }, delay);
+        }
+
+        function startEyeBallYFlow() {
+            if (eyeBallYAnimationId) return;
+            eyeBallYStartTime = performance.now();
+            eyeBallYAnimationId = requestAnimationFrame(updateEyeBallY);
+            startDynamicPeriodChange();
+        }
+        function startBlinkAnimation() {
+            if (blinkState !== 'idle') return;
+            blinkState = 'closing';
+            blinkStartTime = performance.now();
+            setEyeOpen(1.0);
+            if (!animationFrameId) {
+                animationFrameId = requestAnimationFrame(updateBlinkAnimation);
+            }
+        }
+        function stopEyeBallYFlow() {
+            if (eyeBallYAnimationId) {
+                cancelAnimationFrame(eyeBallYAnimationId);
+                eyeBallYAnimationId = null;
+            }
+            if (periodChangeTimer) {
+                clearTimeout(periodChangeTimer);
+                periodChangeTimer = null;
+            }
+        }
+        function updateBlinkAnimation(now) {
+            const elapsed = now - blinkStartTime;
+
+            if (blinkState === 'closing') {
+                let t = elapsed / CLOSE_DURATION;
+                if (t >= 1.0) {
+                    setEyeOpen(0.0);
+                    blinkState = 'opening';
+                    blinkStartTime = now;
+                } else {
+                    const value = 1.0 - t;
+                    setEyeOpen(value);
+                }
+            }
+            else if (blinkState === 'opening') {
+                let t = elapsed / OPEN_DURATION;
+                if (t >= 1.0) {
+                    setEyeOpen(1.0);
+                    blinkState = 'idle';
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                    scheduleNextBlink();
+                    return;
+                } else {
+                    const value = t;
+                    setEyeOpen(value);
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(updateBlinkAnimation);
+        }
+
+        function scheduleNextBlink() {
+            if (nextBlinkTimer) clearTimeout(nextBlinkTimer);
+            const delay = MIN_IDLE + Math.random() * (MAX_IDLE - MIN_IDLE);
+            nextBlinkTimer = setTimeout(() => {
+                startBlinkAnimation();
+            }, delay);
+        }
+
+        (async () => {
+            try {
+                let motionId = 0;
+                l2d.on("loaded", () => {
+                    setEyeOpen(1.0);
+                    scheduleNextBlink();
+                    startEyeBallYFlow();
+                    const motions = l2d.getMotions();
+                    console.log(motions);
+                    l2d.playMotion("Idle", motionId);
+                    const canvasEl = document.getElementById('live2d');
+                    if (canvasEl) {
+                        canvasEl.classList.add('visible');
+                    }
+                });
+                l2d.on('update', () => {
+                    updateAllParams(eyeOpen, eyeOpen, currentEyeBallY);
+                });
+                l2d.on("motionend", (group, index, file) => {
+                    if (motionId == 0) {
+                        motionId = 1;
+                    }
+                    l2d.playMotion("Idle", motionId, 3);
+                });
+                await l2d.load({ path: modelPath });
+            } catch (err) {
+                console.error('模型加载失败:', err);
+            }
+        })();
+        function createFloatBall() {
+            // 避免重复创建
+            if (document.querySelector('.drag-float-ball')) return;
+
+            const ball = document.getElementById('ball');
+            ball.className = 'drag-float-ball';
+            //ball.style.display = 'none';
+            // 使用 SVG 图标（冰火/眼睛风格，呼应模型）
+            ball.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" id="svg" version="1.1" width="400" height="378.4810126582279" viewBox="0 0 400 378.4810126582279"><g id="svgg"><path id="path0" d="M344.417 44.222 C 340.367 45.260,338.012 47.738,336.471 52.583 C 335.509 55.610,334.495 57.739,331.945 62.090 C 315.493 90.158,297.851 112.656,275.250 134.390 C 224.658 183.040,152.834 220.483,67.750 242.561 C 54.920 245.890,51.555 246.728,46.568 247.833 C 44.543 248.281,41.993 248.873,40.902 249.149 C 38.543 249.743,37.050 250.070,28.167 251.934 C 18.903 253.877,18.421 253.966,15.583 254.255 C 10.652 254.757,8.194 255.703,6.261 257.843 C 0.265 264.480,4.492 274.657,13.629 275.582 C 26.390 276.875,48.323 278.344,65.917 279.085 C 72.796 279.375,100.024 279.428,107.833 279.166 C 158.542 277.469,201.261 270.065,239.197 256.398 C 265.217 247.024,289.605 234.060,309.281 219.145 C 312.375 216.799,312.975 216.470,315.769 215.579 C 319.741 214.314,320.483 213.552,328.083 202.917 C 364.347 152.176,374.580 103.690,358.850 57.139 C 356.302 49.597,355.113 47.532,352.245 45.663 C 350.066 44.244,346.728 43.629,344.417 44.222 M101.933 254.694 C 102.131 255.014,101.424 255.456,100.848 255.371 C 100.184 255.274,100.194 255.044,100.875 254.748 C 101.545 254.457,101.780 254.445,101.933 254.694 M100.875 254.748 C 100.194 255.044,100.184 255.274,100.848 255.371 C 101.424 255.456,102.131 255.014,101.933 254.694 C 101.780 254.445,101.545 254.457,100.875 254.748  " stroke="none" fill="#4c5ca3" fill-rule="evenodd"></path><path id="path1" d="M344.485 44.009 C 340.346 44.989,337.568 47.984,336.144 53.000 C 335.281 56.042,333.985 58.465,327.368 69.417 C 281.861 144.735,202.139 201.523,95.961 234.252 C 93.328 235.064,91.202 235.758,91.238 235.793 C 91.336 235.891,98.853 233.555,105.417 231.386 C 175.675 208.168,231.950 176.028,275.250 134.390 C 297.851 112.656,315.493 90.158,331.945 62.090 C 334.495 57.739,335.509 55.610,336.471 52.583 C 338.359 46.649,342.051 43.734,347.297 44.039 C 353.853 44.419,356.458 48.266,361.163 64.519 C 361.704 66.388,362.151 67.820,362.157 67.702 C 362.223 66.286,357.305 51.698,355.982 49.384 C 353.627 45.270,348.763 42.995,344.485 44.009 M362.376 69.000 C 365.323 82.930,366.115 90.317,365.974 102.583 C 365.934 106.067,365.952 108.129,366.014 107.167 C 366.412 100.954,366.081 91.059,365.252 84.384 C 364.567 78.864,362.768 69.022,362.379 68.667 C 362.329 68.621,362.327 68.771,362.376 69.000 M365.718 109.917 C 365.719 110.467,365.750 110.672,365.787 110.372 C 365.825 110.072,365.824 109.622,365.786 109.372 C 365.748 109.122,365.717 109.367,365.718 109.917 M365.550 111.833 C 365.550 112.337,365.581 112.544,365.619 112.292 C 365.658 112.040,365.658 111.627,365.619 111.375 C 365.581 111.123,365.550 111.329,365.550 111.833 M365.259 114.176 C 365.194 114.921,365.176 115.565,365.219 115.608 C 365.262 115.651,365.351 115.077,365.417 114.333 C 365.483 113.589,365.501 112.945,365.457 112.901 C 365.413 112.858,365.324 113.431,365.259 114.176 M364.848 117.458 C 364.542 119.826,363.742 124.628,363.156 127.609 C 362.876 129.036,362.678 130.234,362.717 130.272 C 362.907 130.463,364.720 120.247,365.094 116.875 C 365.280 115.200,365.078 115.678,364.848 117.458 M362.095 132.426 C 356.894 154.596,344.999 179.248,328.083 202.917 C 320.483 213.552,319.741 214.314,315.769 215.579 C 312.975 216.470,312.375 216.799,309.281 219.145 C 265.637 252.231,206.410 272.078,134.667 277.658 C 102.992 280.122,73.923 280.025,34.750 277.323 C 28.411 276.886,18.151 276.040,13.629 275.582 C 5.207 274.729,0.755 265.975,5.269 259.145 C 7.326 256.032,9.854 254.837,15.616 254.253 C 17.009 254.112,18.734 253.879,19.450 253.736 C 23.306 252.963,29.605 251.641,29.750 251.574 C 30.132 251.397,28.455 251.705,23.390 252.742 C 19.807 253.476,17.007 253.947,14.944 254.164 C 10.336 254.648,8.669 255.316,6.398 257.586 C 0.903 263.083,2.622 271.186,10.083 274.953 C 10.725 275.277,11.446 275.680,11.684 275.849 C 12.812 276.645,27.403 283.780,35.333 287.413 C 46.083 292.339,60.016 298.148,68.833 301.381 C 77.567 304.584,79.352 305.225,83.250 306.562 C 91.511 309.394,103.383 312.980,110.917 314.917 C 112.567 315.342,115.154 316.017,116.667 316.419 C 126.819 319.113,144.369 322.476,157.500 324.245 C 183.289 327.717,213.118 327.968,235.917 324.905 C 254.311 322.433,270.093 319.081,283.333 314.834 C 285.029 314.290,287.423 313.618,288.653 313.341 C 292.909 312.384,295.410 310.640,296.896 307.592 C 299.204 302.859,298.320 299.063,293.826 294.415 C 290.695 291.177,289.650 289.549,288.832 286.638 C 286.962 279.985,288.243 271.298,292.885 259.167 C 297.792 246.340,313.878 219.190,319.832 213.685 C 321.570 212.079,324.105 208.846,328.668 202.417 C 343.597 181.382,354.521 159.780,360.231 140.000 C 361.499 135.606,362.706 130.868,362.621 130.614 C 362.589 130.516,362.352 131.332,362.095 132.426 M88.500 236.522 C 87.354 236.881,82.967 238.154,78.750 239.349 C 71.109 241.516,69.728 241.929,70.750 241.745 C 72.128 241.497,90.761 236.115,90.986 235.900 C 91.160 235.733,90.427 235.917,88.500 236.522 M65.000 243.097 C 62.387 243.778,60.041 244.383,59.786 244.440 C 59.531 244.497,59.356 244.578,59.398 244.621 C 59.474 244.696,70.019 242.029,70.153 241.900 C 70.327 241.732,69.437 241.939,65.000 243.097 M55.250 245.589 C 53.692 245.989,50.858 246.674,48.952 247.114 C 47.047 247.553,45.554 247.935,45.636 247.962 C 45.929 248.060,58.260 245.129,58.480 244.909 C 58.638 244.751,57.995 244.886,55.250 245.589 M44.000 248.250 C 43.587 248.370,43.362 248.473,43.500 248.480 C 43.637 248.488,44.125 248.389,44.583 248.262 C 45.042 248.134,45.267 248.030,45.083 248.031 C 44.900 248.032,44.413 248.130,44.000 248.250 M40.333 249.090 C 39.096 249.394,36.785 249.928,35.198 250.277 C 33.611 250.625,32.382 250.933,32.467 250.961 C 32.662 251.026,38.979 249.649,41.417 249.011 C 42.425 248.746,43.100 248.532,42.917 248.533 C 42.733 248.535,41.571 248.785,40.333 249.090 M30.750 251.246 C 30.292 251.364,30.067 251.462,30.250 251.464 C 30.433 251.466,30.958 251.372,31.417 251.254 C 31.875 251.136,32.100 251.038,31.917 251.036 C 31.733 251.034,31.208 251.128,30.750 251.246 " stroke="none" fill="#7bc3a3" fill-rule="evenodd"></path></g></svg>`;
+            document.body.appendChild(ball);
+
+            // 拖拽相关变量
+            let isDragging = false;
+            let hasMoved = false;      // 区分拖拽与点击
+            let startX = 0, startY = 0;
+            let startLeft = 0, startTop = 0;
+            let dragThreshold = 5;     // 移动超过5px视为拖拽
+
+            function getBallPosition() {
+                const left = parseFloat(ball.style.left);
+                const top = parseFloat(ball.style.top);
+                if (!isNaN(left) && !isNaN(top)) {
+                    return { left, top };
+                }
+                const rect = ball.getBoundingClientRect();
+                return { left: rect.left, top: rect.top };
+            }
+
+            function setBallPosition(left, top, constrain = true) {
+                if (constrain) {
+                    const maxX = window.innerWidth - ball.offsetWidth;
+                    const maxY = window.innerHeight - ball.offsetHeight;
+                    left = Math.min(Math.max(0, left), maxX);
+                    top = Math.min(Math.max(0, top), maxY);
+                }
+                ball.style.left = left + 'px';
+                ball.style.top = top + 'px';
+                ball.style.right = 'auto';
+                ball.style.bottom = 'auto';
+            }
+
+            // 初始化位置（右下角，距离底部80px，右边20px）
+            function initPosition() {
+                const rightMargin = 20;
+                const bottomMargin = 80;
+                ball.style.right = rightMargin + 'px';
+                ball.style.bottom = bottomMargin + 'px';
+                ball.style.left = 'auto';
+                ball.style.top = 'auto';
+            }
+            initPosition();
+
+            async function onMouseMove(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                let clientX, clientY;
+                if (e.touches) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                const dx = clientX - startX;
+                const dy = clientY - startY;
+                if (!hasMoved && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+                    hasMoved = true;
+                }
+                const newLeft = startLeft + dx;
+                const newTop = startTop + dy;
+                setBallPosition(newLeft, newTop, true);
+
+                // 关键：每次移动 ball 后，更新交互区域
+                await updateBallRegion();
+            }
+
+            async function onMouseUp(e) {
+                if (!isDragging) return;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                document.removeEventListener('touchmove', onMouseMove);
+                document.removeEventListener('touchend', onMouseUp);
+                document.removeEventListener('touchcancel', onMouseUp);
+
+                if (!hasMoved) {
+                    // 纯点击事件：切换 canvas 显示/隐藏
+                    const canvasElem = document.getElementById('live2d');
+                    if (canvasElem) {
+                        if (canvasElem.classList.contains('visible')) {
+                            canvasElem.classList.remove('visible');
+                        } else {
+                            canvasElem.classList.add('visible');
+                        }
+                    }
+                }
+                // 重置状态
+                isDragging = false;
+                hasMoved = false;
+                ball.style.cursor = 'grab';
+                await updateBallRegion();
+            }
+
+            function onMouseDown(e) {
+                e.preventDefault();
+                let clientX, clientY;
+                if (e.touches) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+                isDragging = true;
+                hasMoved = false;
+                startX = clientX;
+                startY = clientY;
+                // 获取当前元素实际位置（left/top模式）
+                let curLeft, curTop;
+                if (ball.style.left !== '' && ball.style.left !== 'auto') {
+                    curLeft = parseFloat(ball.style.left);
+                    curTop = parseFloat(ball.style.top);
+                } else {
+                    const rect = ball.getBoundingClientRect();
+                    curLeft = rect.left;
+                    curTop = rect.top;
+                }
+                startLeft = curLeft;
+                startTop = curTop;
+                ball.style.cursor = 'grabbing';
+                // 确保元素使用 left/top 定位
+                if (ball.style.right !== 'auto') {
+                    const rect = ball.getBoundingClientRect();
+                    setBallPosition(rect.left, rect.top, false);
+                }
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+                document.addEventListener('touchmove', onMouseMove, { passive: false });
+                document.addEventListener('touchend', onMouseUp);
+                document.addEventListener('touchcancel', onMouseUp);
+            }
+
+            ball.addEventListener('mousedown', onMouseDown);
+            ball.addEventListener('touchstart', onMouseDown, { passive: false });
+
+            // 窗口尺寸变化时重新约束位置
+            window.addEventListener('resize', () => {
+                if (ball.style.left !== 'auto' && ball.style.left !== '') {
+                    let left = parseFloat(ball.style.left);
+                    let top = parseFloat(ball.style.top);
+                    if (!isNaN(left) && !isNaN(top)) {
+                        setBallPosition(left, top, true);
+                    }
+                } else {
+                    initPosition();
+                }
+            });
+            // 定义更新多边形区域的函数
+            async function updateBallRegion() {
+                try {
+                    const rect = ball.getBoundingClientRect();
+                    const winWidth = window.innerWidth;
+                    const winHeight = window.innerHeight;
+                    const left = rect.left / winWidth;
+                    const top = rect.top / winHeight;
+                    const right = (rect.left + rect.width) / winWidth;
+                    const bottom = (rect.top + rect.height) / winHeight;
+                    const points = [[left, top * 0.625], [right, top * 0.625], [right, bottom * 0.625], [left, bottom * 0.625]];
+                    console.log('Points:', points);
+                    await polygon.update("ball-area", points);
+                    await polygon.show("ball-area");
+                    console.log('Polygon updated and shown');
+                } catch (err) {
+                    console.error('Polygon error:', err);
+                }
+            }
+
+            // 初始调用
+            updateBallRegion();
+
+            // 窗口 resize 时重新计算
+            window.addEventListener('resize', () => updateBallRegion());
+        }
+
+        // 调用创建悬浮球
+        createFloatBall();
+
+        // 初始注册
+        //await updateBallRegion();
+        // 窗口大小改变时重新计算
+        //window.addEventListener('resize', updateBallRegion);
+        // 在拖拽结束（onMouseUp）时，如果移动过，重新计算区域
+        // 在 onMouseUp 函数内，原有代码最后加上 updateBallRegion();
+        window.addEventListener('beforeunload', () => {
+            if (nextBlinkTimer) clearTimeout(nextBlinkTimer);
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            if (eyeBallYAnimationId) cancelAnimationFrame(eyeBallYAnimationId);
+            stopEyeBallYFlow();
+        });
+    </script>
+</body>
+
+</html>

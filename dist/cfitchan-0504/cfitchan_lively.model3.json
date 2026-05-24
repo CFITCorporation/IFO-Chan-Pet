@@ -1,0 +1,43 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "cfitchan_lively.moc3",
+		"Textures": [
+			"cfitchan_lively.2048/texture_00.png"
+		],
+		"DisplayInfo": "cfitchan_lively.cdi3.json",
+		"Expressions": [
+			{
+				"Name": "Scene1",
+				"File": "expressions/Scene1.exp3.json"
+			},
+			{
+				"Name": "new scene",
+				"File": "expressions/new scene.exp3.json"
+			}
+		],
+		"Motions": {
+			"Idle": [
+				{
+					"File": "Scene1.motion3.json"
+				},
+				{
+					"File": "new scene.motion3.json"
+				}
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": []
+		}
+	],
+	"HitAreas": []
+}
